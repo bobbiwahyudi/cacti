@@ -1,0 +1,18 @@
+======Add multiple devices on cacti======
+1. Create file for example $vim /tmp/adddev
+2. Put descriptions & IP in /tmp/adddev
+ 
+ example {must follow the format}:
+ Description IP 
+ example:
+ Server1 100.2.2.20
+ Server2 100.4.3.50
+ 
+3. Go to cacti directory /var/www/html/cacti 
+4. Use below script to add all devices on /tmp/adddev (below is example for SNMP community v2c)
+
+while read i j; 
+do sudo php cli/add_device.php --description=$i --ip=$j --community=[community] --template=[template_no];
+done < /tmp/adddev
+
+--please wait the script until completed
