@@ -6,19 +6,19 @@ INSTALL CACTI
 This procedure is to install cacti with spine on Ubuntu Server (21.10)
 
 1. set timezone ubuntu:
-sudo timedatectl set-timezone Asia/Jakarta
+$ sudo timedatectl set-timezone Asia/Jakarta
 
 2. add repository for PHP :
-sudo apt install lsb-release ca-certificates apt-transport-https software-properties-common -y
-sudo add-apt-repository ppa:ondrej/php
+$ sudo apt install lsb-release ca-certificates apt-transport-https software-properties-common -y
+$ sudo add-apt-repository ppa:ondrej/php
 
 3. install php modules and addon:
-sudo apt -y install php php-{mysql,curl,net-socket,gd,intl,pear,imap,memcache,pspell,tidy,xmlrpc,snmp,mbstring,gmp,json,xml,common,ldap}
-sudo apt install libapache2-mod-php libssl-dev libphp-phpmailer dos2unix autotools-dev autoconf
+$ sudo apt -y install php php-{mysql,curl,net-socket,gd,intl,pear,imap,memcache,pspell,tidy,xmlrpc,snmp,mbstring,gmp,json,xml,common,ldap}
+$ sudo apt install libapache2-mod-php libssl-dev libphp-phpmailer dos2unix autotools-dev autoconf
 
 4. Update php parameter :
-sudo vim /etc/php/*/apache2/php.ini
-sudo vim /etc/php/*/cli/php.ini
+$ sudo vim /etc/php/*/apache2/php.ini
+$ sudo vim /etc/php/*/cli/php.ini
 ----- add below line into file and commented on existing line with same name
 date.timezone = "Asia/Jakarta"
 memory_limit = 512M
@@ -26,23 +26,23 @@ max_execution_time = 300
 -----
 
 5. Install Apache Web server
-sudo apt install apache2
+$ sudo apt install apache2
 
 6. Modify Apache settings
-sudo vim /etc/apache2/conf-enabled/security.conf
+$ sudo vim /etc/apache2/conf-enabled/security.conf
 ServerTokens Prod
 
 7. Allow ufw
-sudo ufw allow http
-sudo ufw allow https
+$ sudo ufw allow http
+$ sudo ufw allow https
 
-sudo systemctl restart apache2
+$ sudo systemctl restart apache2
 
 8. Configure and install MariaDB server
-sudo apt install mariadb-server -y
+$ sudo apt install mariadb-server -y
 
 9. Modify MariaDB parameter as below 
-sudo vim /etc/mysql/mariadb.conf.d/50-server.cnf
+$ sudo vim /etc/mysql/mariadb.conf.d/50-server.cnf
 ----- add below line into file and commented on existing line with same name
 [mysqld]
 innodb_file_format=Barracuda
@@ -66,7 +66,7 @@ Comment out other settings on local
 #character-set-server  = utf8mb4
 #collation-server      = utf8mb4_general_ci
 -----
-sudo systemctl restart mariadb
+$ sudo systemctl restart mariadb
 
 to check MariaDB:
 $ sudo mysql -u root
@@ -81,16 +81,16 @@ MariaDB [(none)]> exit
 Bye
 
 10. Create CactiDB
-sudo mysql -u root -p
+$ sudo mysql -u root -p
 CREATE DATABASE cacti DEFAULT CHARACTER SET utf8 COLLATE utf8_unicode_ci ;
-GRANT ALL PRIVILEGES ON cacti.* TO 'cactiuser'@'localhost' IDENTIFIED BY '012345';
+GRANT ALL PRIVILEGES ON cacti.* TO 'cactiuser'@'localhost' IDENTIFIED BY 'strongpassword';
 GRANT SELECT ON mysql.time_zone_name TO cactiuser@localhost;
 ALTER DATABASE cacti CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 FLUSH PRIVILEGES;
 EXIT;
 
 test db
-mysql -u cactiuser -p
+$ mysql -u cactiuser -p
 MariaDB [(none)]> show databases;
 +--------------------+
 | Database |
@@ -110,7 +110,7 @@ Warning: Unable to load '/usr/share/zoneinfo/leap-seconds.list' as time zone. Sk
 #exit
 
 12. Install SNMP and modules
-sudo apt install snmp snmpd snmp-mibs-downloader rrdtool
+$ sudo apt install snmp snmpd snmp-mibs-downloader rrdtool
 
 13. Clone cacti from github
 $ sudo apt install git
@@ -119,44 +119,45 @@ $ git clone -b 1.2.x  https://github.com/Cacti/cacti.git
 14. Move Cacti directory to intended location 
 $ sudo mv cacti /var/www/html
 
-populate cacti db :
-sudo mysql -u root cacti < /var/www/html/cacti/cacti.sql
+15. populate cacti db :
+$ sudo mysql -u root cacti < /var/www/html/cacti/cacti.sql
 
-setup php config
-sudo mv /var/www/html/cacti/include/config.php.dist /var/www/html/cacti/include/config.php
+16. setup php config
+$ sudo mv /var/www/html/cacti/include/config.php.dist /var/www/html/cacti/include/config.php
 
-sudo vim /var/www/html/cacti/include/config.php
+$sudo vim /var/www/html/cacti/include/config.php
+-----
 $database_type     = 'mysql';
 $database_default  = 'cacti';
 $database_hostname = 'localhost';
 $database_username = 'cactiuser';
-$database_password = '012345';
+$database_password = 'strongpassword';
 
-Configure SNMP:
-sudo vim /etc/snmp/snmp.conf
+17. Configure SNMP:
+$ sudo vim /etc/snmp/snmp.conf
 change 
 mibs :
 to
 # mibs :
 
-sudo vim /etc/snmp/snmpd.conf
+$ sudo vim /etc/snmp/snmpd.conf
 rocommunity mycacti localhost
 disable public 
 #rocommunity public default -V systemonly
 #rocommunity6 public default -V systemonly
 
-sudo systemctl restart snmpd
+$ sudo systemctl restart snmpd
 
-validate:
-sudo snmpwalk -v 2c -c mycacti localhost system
+18. validate snmp:
+$ sudo snmpwalk -v 2c -c mycacti localhost system
 
-Set Cacti directory permissions:
+19. Set Cacti directory permissions:
 
-sudo chown -R www-data:www-data /var/www/html/cacti
+$ sudo chown -R www-data:www-data /var/www/html/cacti
 
-Create systemd unit file for Cacti:
+20. Create systemd unit file for Cacti:
 
-sudo tee /etc/systemd/system/cactid.service<<EOF
+$ sudo tee /etc/systemd/system/cactid.service<<EOF
 [Unit]
 Description=Cacti Daemon Main Poller Service
 After=network.target
@@ -174,52 +175,56 @@ RestartSec=5s
 WantedBy=multi-user.target
 EOF
 
+21. Touch environment file:
 
-Touch environment file:
+$ sudo touch /etc/default/cactid
 
-sudo touch /etc/default/cactid
+22. Now start and enable cacti service:
 
-Now start and enable cacti service:
+$ sudo systemctl daemon-reload
+$ sudo systemctl enable cactid
+$ sudo systemctl restart cactid
 
-sudo systemctl daemon-reload
-sudo systemctl enable cactid
-sudo systemctl restart cactid
+23. Check status of cactid service:
 
-Check status of cactid service:
+$ sudo systemctl status cactid
 
-sudo systemctl status cactid
+24. Install and configure spine:
+download latest version :
+$ wget https://www.cacti.net/downloads/spine/cacti-spine-latest.tar.gz
 
-Install and configure spine:
-download latest version
+25. Install additional modules: 
+$ sudo apt install build-essential autoconf automake dos2unix gzip help2man m4 make wget libtool libsnmp-dev libmariadb-dev libmariadb-dev-compat
 
-wget https://www.cacti.net/downloads/spine/cacti-spine-latest.tar.gz
+25. Unzip Spine :
+$ tar zxvf cacti-spine-latest.tar.gz
 
-sudo apt install build-essential autoconf automake dos2unix gzip help2man m4 make wget libtool libsnmp-dev libmariadb-dev libmariadb-dev-compat
+26. Install Spine:
 
-tar zxvf cacti-spine-latest.tar.gz
+$ cd cacti-spine-*/
+$ sudo ./bootstrap
+$ sudo ./configure
+$ sudo make
+$ sudo make install
 
-cd cacti-spine-*/
-sudo ./bootstrap
+27. Change Spine permission :
+$ sudo chown root:root /usr/local/spine/bin/spine
+$ sudo chmod u+s /usr/local/spine/bin/spine
 
-sudo ./configure
-sudo make
-sudo make install
-sudo chown root:root /usr/local/spine/bin/spine
-sudo chmod u+s /usr/local/spine/bin/spine
-
-sudo cp /usr/local/spine/etc/spine.conf.dist /usr/local/spine/etc/spine.conf
-
-sudo vim /usr/local/spine/etc/spine.conf
+28. Configure Spine:
+$ sudo cp /usr/local/spine/etc/spine.conf.dist /usr/local/spine/etc/spine.conf
+$ sudo vim /usr/local/spine/etc/spine.conf
+-----
 DB_Host localhost
 DB_Database cacti
 DB_User cactiuser
-DB_Pass 012345
+DB_Pass strongpassword
 DB_Port 3306
+-----
 
+29. Enable the poller to collect data from monitored devices, add a new crontab to be able to query devices via SNMP
 
-enable the poller to collect data from monitored devices, add a new crontab to be able to query devices via SNMP
-
-sudo crontab -u www-data -e
+$ sudo crontab -u www-data -e
 
 */5 * * * * /usr/bin/php /var/www/html/cacti/poller.php
 
