@@ -1,0 +1,220 @@
+==============
+INSTALL CACTI
+============== 
+==============START Procedure
+set timezone ubuntu:
+sudo timedatectl set-timezone Asia/Jakarta
+
+add repository for PHP :
+sudo apt install lsb-release ca-certificates apt-transport-https software-properties-common -y
+sudo add-apt-repository ppa:ondrej/php
+
+add repository Ansible:
+sudo add-apt-repository --yes --update ppa:ansible/ansible
+
+install php modules and addon:
+sudo apt -y install php php-{mysql,curl,net-socket,gd,intl,pear,imap,memcache,pspell,tidy,xmlrpc,snmp,mbstring,gmp,json,xml,common,ldap}
+sudo apt install libapache2-mod-php libssl-dev libphp-phpmailer dos2unix autotools-dev autoconf
+
+
+- Update php parameter :
+sudo vim /etc/php/*/apache2/php.ini
+sudo vim /etc/php/*/cli/php.ini
+
+date.timezone = "Asia/Jakarta"
+memory_limit = 512M
+max_execution_time = 300
+
+Install Apache Web server
+sudo apt install apache2
+
+sudo vim /etc/apache2/conf-enabled/security.conf
+ServerTokens Prod
+
+sudo ufw allow http
+sudo ufw allow https
+
+sudo systemctl restart apache2
+
+Configure and install MariaDB server
+sudo apt install mariadb-server -y
+
+sudo vim /etc/mysql/mariadb.conf.d/50-server.cnf
+[mysqld]
+innodb_file_format=Barracuda
+innodb_large_prefix=1
+collation-server=utf8mb4_unicode_ci
+character-set-server=utf8mb4
+innodb_doublewrite=OFF
+max_heap_table_size=256M
+tmp_table_size=256M
+join_buffer_size=512M
+innodb_buffer_pool_size=3G
+innodb_flush_log_at_timeout=3
+innodb_read_io_threads=32
+innodb_write_io_threads=16
+innodb_io_capacity=5000
+innodb_io_capacity_max=10000
+innodb_buffer_pool_instances=9
+
+Comment out other settings on local
+#around line 106
+#character-set-server  = utf8mb4
+#collation-server      = utf8mb4_general_ci
+
+sudo systemctl restart mariadb
+
+to check MariaDB:
+$ sudo mysql -u root
+MariaDB [(none)]> select @@tmp_table_size;
++------------------+
+| @@tmp_table_size |
++------------------+
+| 134217728 |
++------------------+
+1 row in set (0.00 sec)
+MariaDB [(none)]> exit
+Bye
+
+Create CactiDB
+sudo mysql -u root -p
+CREATE DATABASE cacti DEFAULT CHARACTER SET utf8 COLLATE utf8_unicode_ci ;
+GRANT ALL PRIVILEGES ON cacti.* TO 'cactiuser'@'localhost' IDENTIFIED BY '012345';
+GRANT SELECT ON mysql.time_zone_name TO cactiuser@localhost;
+ALTER DATABASE cacti CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+FLUSH PRIVILEGES;
+EXIT;
+
+test db
+mysql -u cactiuser -p
+MariaDB [(none)]> show databases;
++--------------------+
+| Database |
++--------------------+
+| cacti |
+| information_schema |
++--------------------+
+2 rows in set (0.00 sec)
+
+MariaDB [(none)]> \q
+
+Setup mysql timezone for cacti database user
+$ sudo su -
+$ mysql_tzinfo_to_sql /usr/share/zoneinfo | mysql -u root -p mysql
+Enter password: 
+Warning: Unable to load '/usr/share/zoneinfo/leap-seconds.list' as time zone. Skipping it.
+
+Install SNMP and modules
+sudo apt install snmp snmpd snmp-mibs-downloader rrdtool
+
+Clone cacti from github
+$ sudo apt install git
+$ git clone -b 1.2.x  https://github.com/Cacti/cacti.git
+
+sudo mv cacti /var/www/html
+
+populate cacti db :
+sudo mysql -u root cacti < /var/www/html/cacti/cacti.sql
+
+setup php config
+sudo mv /var/www/html/cacti/include/config.php.dist /var/www/html/cacti/include/config.php
+
+sudo vim /var/www/html/cacti/include/config.php
+$database_type     = 'mysql';
+$database_default  = 'cacti';
+$database_hostname = 'localhost';
+$database_username = 'cactiuser';
+$database_password = '012345';
+
+Configure SNMP:
+sudo vim /etc/snmp/snmp.conf
+change 
+mibs :
+to
+# mibs :
+
+sudo vim /etc/snmp/snmpd.conf
+rocommunity mycacti localhost
+disable public 
+#rocommunity public default -V systemonly
+#rocommunity6 public default -V systemonly
+
+sudo systemctl restart snmpd
+
+validate:
+sudo snmpwalk -v 2c -c mycacti localhost system
+
+Set Cacti directory permissions:
+
+sudo chown -R www-data:www-data /var/www/html/cacti
+
+Create systemd unit file for Cacti:
+
+sudo tee /etc/systemd/system/cactid.service<<EOF
+[Unit]
+Description=Cacti Daemon Main Poller Service
+After=network.target
+
+[Service]
+Type=forking
+User=www-data
+Group=www-data
+EnvironmentFile=/etc/default/cactid
+ExecStart=/var/www/html/cacti/cactid.php
+Restart=always
+RestartSec=5s
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+
+Touch environment file:
+
+sudo touch /etc/default/cactid
+
+Now start and enable cacti service:
+
+sudo systemctl daemon-reload
+sudo systemctl enable cactid
+sudo systemctl restart cactid
+
+Check status of cactid service:
+
+sudo systemctl status cactid
+
+Install and configure spine:
+download latest version
+
+wget https://www.cacti.net/downloads/spine/cacti-spine-latest.tar.gz
+
+sudo apt install build-essential autoconf automake dos2unix gzip help2man m4 make wget libtool libsnmp-dev libmariadb-dev libmariadb-dev-compat
+
+tar zxvf cacti-spine-latest.tar.gz
+
+cd cacti-spine-*/
+sudo ./bootstrap
+
+sudo ./configure
+sudo make
+sudo make install
+sudo chown root:root /usr/local/spine/bin/spine
+sudo chmod u+s /usr/local/spine/bin/spine
+
+sudo cp /usr/local/spine/etc/spine.conf.dist /usr/local/spine/etc/spine.conf
+
+sudo vim /usr/local/spine/etc/spine.conf
+DB_Host localhost
+DB_Database cacti
+DB_User cactiuser
+DB_Pass 012345
+DB_Port 3306
+
+
+enable the poller to collect data from monitored devices, add a new crontab to be able to query devices via SNMP
+
+sudo crontab -u www-data -e
+
+*/5 * * * * /usr/bin/php /var/www/html/cacti/poller.php
+
+=====================END of procedure
