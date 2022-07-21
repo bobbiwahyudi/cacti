@@ -1,0 +1,249 @@
+Install debian from DVD
+ check ssh server
+ uncheck Desktop environment and GNOME
+
+>Modified apt sources list 
+#nano /etc/apt/sources.list 
+>disable local disk as sources, modified as below 
+------------------------------------------------------------------------
+deb http://deb.debian.org/debian/ bullseye main contrib non-free
+deb-src http://deb.debian.org/debian/ bullseye main contrib non-free
+
+deb http://security.debian.org/debian-security bullseye-security main contrib non-free
+deb-src http://security.debian.org/debian-security bullseye-security main contrib non-free
+
+deb http://deb.debian.org/debian/ bullseye-updates main contrib non-free
+deb-src http://deb.debian.org/debian/ bullseye-updates main contrib non-free
+-------------------------------------------------------------------------------------
+ 
+>install sudo
+
+ENABLE INSTALLING PHP8 <-- Optional
+#apt-get install ca-certificates apt-transport-https software-properties-common wget curl sudo vim fping lsb-release -y
+#curl -sSL https://packages.sury.org/php/README.txt | sudo bash -x
+
+add user to sudoer
+$su -
+#usermod -aG sudo username
+#nano /etc/sudoers
+add user to last line 
+username ALL=(ALL:ALL) ALL 
+ example : fhoss ALL=(ALL:ALL) ALL
+
+>INSTALL CACTI ON DEBIAN 11 
+$sudo apt update
+$sudo apt -y install acl composer git graphviz imagemagick mariadb-client mariadb-server mtr-tiny nginx-full python3-memcache python3-mysqldb whois rrdtool librrds-perl
+$sudo apt -y install snmp snmpd snmp-mibs-downloader
+$sudo apt -y install build-essential autoconf automake dos2unix gzip help2man m4 make wget libtool libsnmp-dev libmariadb-dev libmariadb-dev-compat
+
+>INSTALL PHP AND COMPONENT
+$sudo apt -y install php8.1 php8.1-{cli,fpm,phpdbg,common,intl,imap,memcache,pspell,tidy,mysql,zip,gd,mbstring,curl,xml,xmlrpc,bcmath,snmp,mbstring,gmp,ldap}
+$sudo apt -y install php-{net-socket,pear,json}
+
+$git clone -b 1.2.x  https://github.com/Cacti/cacti.git
+$wget https://www.cacti.net/downloads/spine/cacti-spine-latest.tar.gz
+
+
+>SETTING UP PHP:
+sudo vim /etc/php/*/fpm/php.ini
+sudo vim /etc/php/*/cli/php.ini
+
+date.timezone = "Asia/Jakarta"
+memory_limit = 512M
+max_execution_time = 300
+
+$sudo vim /etc/php/*/fpm/pool.d/www.conf
+
+listen = /run/php/php8.1-fpm.sock
+
+$sudo systemctl restart php*-fpm.service
+
+>SETTING UP MARIADB:
+$sudo vim /etc/mysql/mariadb.conf.d/50-server.cnf
+[mysqld]
+innodb_file_format=Barracuda
+innodb_large_prefix=1
+collation-server=utf8mb4_unicode_ci
+character-set-server=utf8mb4
+innodb_doublewrite=OFF
+max_heap_table_size=256M
+tmp_table_size=256M
+join_buffer_size=512M
+innodb_buffer_pool_size=3G
+innodb_flush_log_at_timeout=3
+innodb_read_io_threads=32
+innodb_write_io_threads=16
+innodb_io_capacity=5000
+innodb_io_capacity_max=10000
+innodb_buffer_pool_instances=9
+
+Comment out other settings on local
+#around line 106
+#character-set-server  = utf8mb4
+#collation-server      = utf8mb4_general_ci
+
+>Setup mysql timezone for cacti database user
+$ su -
+# mysql_tzinfo_to_sql /usr/share/zoneinfo | mysql -u root -p mysql
+
+$sudo mysql -u root -p mysql < /usr/share/mysql/mysql_test_data_timezone.sql
+
+$sudo mysql -u root -p
+
+$sudo systemctl restart mariadb
+
+>Create CactiDB:
+$sudo mysql -u root -p
+CREATE DATABASE cacti DEFAULT CHARACTER SET utf8 COLLATE utf8_unicode_ci ;
+GRANT ALL PRIVILEGES ON cacti.* TO 'cactiuser'@'localhost' IDENTIFIED BY '012345';
+GRANT SELECT ON mysql.time_zone_name TO cactiuser@localhost;
+ALTER DATABASE cacti CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+FLUSH PRIVILEGES;
+EXIT;
+
+$sudo systemctl restart mariadb
+
+>SETTING UP NGINX:
+
+$sudo rm /etc/nginx/sites-enabled/default
+
+$sudo vim /etc/nginx/conf.d/cacticonfig.conf
+
+server {
+ listen      80;
+ server_name cacti.example.com;
+ root        /var/www/html;
+ index       index.php;
+ access_log  /var/log/nginx/cacti_access.log;
+ error_log   /var/log/nginx/cacti_error.log;
+ charset utf-8;
+ gzip on;
+ gzip_types text/css application/javascript text/javascript application/x-javascript image/svg+xml text/plain text/xsd text/xsl text/xml image/x-icon;
+ location / {
+   try_files $uri $uri/ /index.php?$query_string;
+  }
+  location /api/v0 {
+   try_files $uri $uri/ /api_v0.php?$query_string;
+  }
+  location ~ .php {
+   include fastcgi.conf;
+   fastcgi_split_path_info ^(.+.php)(/.+)$;
+   fastcgi_pass unix:/run/php/php-fpm.sock;
+  }
+  location ~ /.ht {
+   deny all;
+  }
+ }
+ 
+$sudo systemctl restart nginx
+ 
+>SETTING UP CACTI:
+ 
+$sudo cp -R cacti /var/www/html/cacti
+ 
+$sudo chown -R www-data:www-data /var/www/html/
+ 
+>import cacti predefine:
+ 
+$sudo mysql -u root -p cacti < /var/www/html/cacti/cacti.sql
+ 
+>change cacti config:
+sudo cp /var/www/html/cacti/include/config.php.dist /var/www/html/cacti/include/config.php
+ 
+$sudo vim /var/www/html/cacti/include/config.php
+>modified below information as needed
+$database_type     = 'mysql';
+$database_default  = 'cacti';
+$database_hostname = 'localhost';
+$database_username = 'cactiuser';
+$database_password = '012345';
+$database_port = "3306";
+$database_ssl = false;
+
+>Configure SNMP:
+$sudo vim /etc/snmp/snmp.conf
+change 
+mibs :
+to
+# mibs :
+
+$sudo vim /etc/snmp/snmpd.conf
+rocommunity mycacti localhost
+disable public 
+#rocommunity public default -V systemonly
+#rocommunity6 public default -V systemonly
+
+$sudo systemctl restart snmpd
+
+When using Spine, don't change crontab or systemd settings! Always use poller.php with crontab or cactid.php for systemd!
+-------------------------------------------------------------------------------------------------------------------------
+
+>Install and configure spine:
+>download latest version
+
+$wget https://www.cacti.net/downloads/spine/cacti-spine-latest.tar.gz
+
+$tar zxvf cacti-spine-latest.tar.gz
+
+$cd cacti-spine-*/
+$sudo ./bootstrap
+
+$sudo ./configure
+$sudo make
+$sudo make install
+$sudo chown root:root /usr/local/spine/bin/spine
+$sudo chmod u+s /usr/local/spine/bin/spine
+
+$sudo cp /usr/local/spine/etc/spine.conf.dist /usr/local/spine/etc/spine.conf
+
+$sudo vim /usr/local/spine/etc/spine.conf
+
+DB_Host       localhost
+DB_Database   cacti
+DB_User       cactiuser <-- enter your db username
+DB_Pass       012345 <-- enter your db password
+DB_Port       3306
+#DB_UseSSL    0
+#DB_SSL_Key
+#DB_SSL_Cert
+#DB_SSL_CA
+Cacti_Log     /var/www/html/cacti/log/cacti.log <-- uncomment here
+
+########################################### OPTIONAL <--- using Systemd is preferred
+> enable the poller to collect data from monitored devices, add a new crontab to be able to query devices via SNMP
+
+>Verify NGINX
+
+sudo nginx  -t
+==========================================
+add cron
+sudo vim /etc/cron.d/cacti
+*/5 * * * * www-data php /var/www/html/cacti/poller.php > /dev/null 2>&1
+########################################### OR
+Create Cacti Systemd service ( System Daemon )--> Preferred <--
+
+$sudo vim /etc/systemd/system/cactid.service
+
+Add and save :
+[Unit]
+Description=Cacti Daemon Main Poller Service
+After=network.target
+[Service]
+Type=forking
+User=www-data
+Group=www-data
+EnvironmentFile=/etc/default/cactid
+ExecStart=/var/www/html/cacti/cactid.php
+Restart=always
+RestartSec=5s
+[Install]
+WantedBy=multi-user.target
+
+>Create an environment file :
+$sudo touch /etc/default/cactid
+
+>Start and enable
+$sudo systemctl daemon-reload
+$sudo systemctl enable cactid
+$sudo systemctl restart cactid
+$sudo systemctl status cactid
