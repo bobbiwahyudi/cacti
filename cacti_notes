@@ -1,1 +1,10 @@
 
+1. to export Cacti devices/host list on old cacti, use below steps:
+
+login to mysql
+#mysql -u root -p
+mysql>USE cacti;
+mysql>select * from host INTO OUTFILE '/tmp/host.txt';
+
+you will find output result on directory /tmp directory
+------------Done
