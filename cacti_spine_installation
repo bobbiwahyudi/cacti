@@ -221,6 +221,10 @@ DB_User cactiuser
 DB_Pass strongpassword
 DB_Port 3306
 -----
+checking spine
+in spine directory, run:
+
+#./spine -R -S -V 3
 
 29. Enable the poller to collect data from monitored devices, add a new crontab to be able to query devices via SNMP
 
