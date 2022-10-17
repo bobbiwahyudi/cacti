@@ -8,3 +8,6 @@ mysql>select * from host INTO OUTFILE '/tmp/host.txt';
 
 you will find output result on directory /tmp directory
 ------------Done
+
+REBUILD CACTI POLLER CACHE:
+#php -q /var/www/html/cacti/cli/rebuild_poller_cache.php
