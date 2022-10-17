@@ -11,3 +11,5 @@ you will find output result on directory /tmp directory
 
 REBUILD CACTI POLLER CACHE:
 #php -q /var/www/html/cacti/cli/rebuild_poller_cache.php
+
+https://www.ibm.com/support/pages/improve-rtm-performance-spine-poller
