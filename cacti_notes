@@ -15,3 +15,6 @@ REBUILD CACTI POLLER CACHE:
 
 Further read:
 https://www.ibm.com/support/pages/improve-rtm-performance-spine-poller
+
+Debug NaN graph:
+https://forums.cacti.net/viewtopic.php?t=15136
