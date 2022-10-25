@@ -26,3 +26,6 @@ Reset Cacti without reinstalling:
 3) delete the cacti database from mysql command line: drop database cacti;
 4) recreate database cacti as defined by the installation manual: create database cacti;
 5) Fill database with default tables: mysql --user=cactiuser -p cacti < cacti.sql
+
+find :
+find /etc/ -type f -exec grep -l -i "pam_tally" {} \;
